@@ -1,0 +1,1 @@
+This is a repository containing inference and event pushing scripts for KSS (_Kitchen Safety System_)

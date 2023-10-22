@@ -1,0 +1,12 @@
+.vscode/
+datasets/
+env/
+venv/
+runs/
+*.log
+*.png
+*.jpg
+*.avi
+*.ckpt
+*.pt
+*.onnx
