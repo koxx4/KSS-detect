@@ -1,0 +1,4 @@
+numpy~=1.26.0
+torchvision~=0.16.0
+picamera2~=0.3.14 # NOTE: on Ubuntu you need to install libcap-dev
+ultralytics~=8.0.208
