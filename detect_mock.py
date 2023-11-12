@@ -6,10 +6,11 @@ import pickle
 from pymongo import MongoClient
 from event import KssEvent
 
+client = MongoClient('localhost', 27017)
+db = client['kss']
 
-def save_event_to_mongo(kss_event):
-    client = MongoClient('localhost', 27017)
-    db = client['kss']
+
+def save_event_to_mongo(kss_event: KssEvent):
     collection = db['kss-events']
 
     # Konwersja obrazu do formatu binarnego
