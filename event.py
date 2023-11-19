@@ -1,14 +1,12 @@
 from datetime import datetime, timezone
 
-import numpy
-
 
 class KssEvent:
 
     def __init__(self,
                  name: str,
                  count: int,
-                 image: numpy.ndarray,
+                 image: bytes,
                  confidence: float,
                  date=None,
                  important=False,
@@ -23,7 +21,7 @@ class KssEvent:
 
     def __str__(self):
         bounding_boxes_str = ', '.join(f"({x}, {y}, {w}, {h})" for x, y, w, h in (self.bounding_boxes or []))
-        image_shape = self.image.shape if self.image is not None else "None"
+        image_shape = self.image if self.image is not None else "None"
         return (f"DetectedObject(\n"
                 f"  Name: {self.name}\n"
                 f"  Count: {self.count}\n"
