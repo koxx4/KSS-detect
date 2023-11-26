@@ -1,4 +1,6 @@
-from datetime import datetime, timezone
+from datetime import datetime
+
+import pytz
 from bson import ObjectId
 
 from event_object import EventObject
@@ -13,12 +15,28 @@ class KssEvent:
                  important=False,
                  read=False):
         if objects is None:
-            objects = {}
+            objects = []
         self.objects = objects
         self.image_id = image_id
-        self.date = date if date is not None else datetime.now()
+        self.date = date if date is not None else pytz.utc.localize(datetime.utcnow())
         self.important = important
         self.read = read
+
+    @property
+    def object_ids(self) -> set[str]:
+        """Zwraca zbiór identyfikatorów zdarzeń z obiektów."""
+        if self.objects is None:
+            return set()
+
+        return {obj.name_count_id for obj in self.objects}
+
+    @property
+    def object_ids_str(self) -> str:
+        """Zwraca zbiór identyfikatorów zdarzeń z obiektów."""
+        if self.objects is None:
+            return ''
+
+        return ', '.join(self.object_ids)
 
     def __dict__(self) -> dict:
         return {

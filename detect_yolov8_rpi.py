@@ -1,12 +1,10 @@
 import cv2
-from ultralytics import YOLO
-from picamera2 import Picamera2
 from bson import ObjectId
-from datetime import datetime
+from picamera2 import Picamera2
+from ultralytics import YOLO
 
 from event import KssEvent
 from event_object import EventObject
-
 
 model = YOLO("yolov5nu-v7-b-q.onnx")
 picam2 = Picamera2()
@@ -39,7 +37,7 @@ while True:
         for class_name, info in class_counts.items()
     ]
 
-    kss_event = KssEvent(objects=processed_objects, image_id=ObjectId(), date=datetime.now())
+    kss_event = KssEvent(objects=processed_objects, image_id=ObjectId())
     print(kss_event)  # or handle the kss_event as needed
 
     out.write(results[0].plot())

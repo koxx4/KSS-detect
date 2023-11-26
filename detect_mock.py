@@ -3,11 +3,11 @@ import os
 import random
 import time
 
-import gridfs
 from pymongo import MongoClient
 
 from event import KssEvent
 from event_object import EventObject
+from kss_event_service import KssEventService
 from object_tracker import ObjectTracker
 
 logging.basicConfig(level=logging.DEBUG)
@@ -21,27 +21,13 @@ def load_image_paths(image_folder):
 image_mock_folder = 'mock_images'
 image_paths = load_image_paths(image_mock_folder)
 
-client = MongoClient('localhost', 27017)
-db = client['kss']
-
 
 def load_image_as_bytes(image_path):
     with open(image_path, 'rb') as image_file:
         return image_file.read()
 
 
-def save_event_to_mongo(kss_event: KssEvent, kss_event_image: bytes):
-    collection = db['kss-events']
-
-    fs = gridfs.GridFS(db)
-    image_id = fs.put(kss_event_image)
-    kss_event.image_id = image_id
-
-    event_data = kss_event.__dict__()
-    collection.insert_one(event_data)
-
-
-def mock_object_generator(events_probabilities, max_delay=10, tracker: ObjectTracker = None):
+def mock_object_generator(events_probabilities, max_delay=10):
     object_names = list(events_probabilities.keys())
 
     while True:
@@ -55,22 +41,6 @@ def mock_object_generator(events_probabilities, max_delay=10, tracker: ObjectTra
                 ))
 
         if detected_objects:
-            if tracker:
-                tracker.update(detected_objects)
-                stable_objects_ids = tracker.get_stable_objects()
-
-                # Debug print visualizing differences between objects lists
-                previous_set = {obj.name_count_id for obj in detected_objects}
-                current_set = {obj_id for obj_id in stable_objects_ids}
-
-                removed = previous_set - current_set
-                print("Removed objects:", ", ".join(removed))
-
-                # Replace detected objects with stable objects that
-                # were qualified by object tracker
-                detected_objects = [obj for obj in detected_objects if obj.name_count_id in stable_objects_ids]
-                print(f"Finally persistent objects: {[obj.__str__() for obj in detected_objects]}")
-
             random_image_path = random.choice(image_paths)
             image_bytes = load_image_as_bytes(random_image_path)
 
@@ -98,9 +68,12 @@ probabilities = {
     "Closed pan": 0.8,
 }
 
-generator = mock_object_generator(probabilities, max_delay=6, tracker=ObjectTracker(3.0, 3.0))
+client = MongoClient('localhost', 27017)
+db = client['kss']
+
+generator = mock_object_generator(probabilities, max_delay=6)
+event_service = KssEventService(db, input_duration_threshold=3, output_duration_threshold=3)
 
 for event, event_image in generator:
     if event.objects:
-        save_event_to_mongo(kss_event=event, kss_event_image=event_image)
-    print(event)
+        event_service.save_event(event=event, event_image_bytes=event_image)

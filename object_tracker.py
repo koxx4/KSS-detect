@@ -1,5 +1,5 @@
-import logging
 import time
+from loguru import logger
 
 from event_object import EventObject
 
@@ -40,8 +40,11 @@ class ObjectTracker:
 
         # Usunięcie obiektów niewykrytych przez dłuższy czas
         for obj_id in list(self.last_seen.keys()):
-            if (current_time - self.last_seen[obj_id] > self.output_duration_threshold
-                    and obj_id not in detected_object_ids):
+            last_seen = current_time - self.last_seen[obj_id]
+            logger.debug(f"{obj_id} last seen {last_seen:.2f} seconds ago")
+            if last_seen > self.output_duration_threshold and obj_id not in detected_object_ids:
+                logger.debug(
+                    f"Removing object '{obj_id}' from tracking - not detected for over {self.output_duration_threshold} seconds")
                 del self.first_seen[obj_id]
                 del self.last_seen[obj_id]
 
@@ -56,14 +59,13 @@ class ObjectTracker:
         current_time = time.time()
         for obj_id, first_seen_time in self.first_seen.items():
             if current_time - first_seen_time >= self.input_duration_threshold:
-                if current_time - self.last_seen[obj_id] <= self.output_duration_threshold:
-                    stable_objects.append(obj_id)
-                    logging.debug(
-                        f"Object ID '{obj_id}' is stable. Detected for {current_time - first_seen_time:.2f} seconds.")
-                else:
-                    logging.debug(
-                        f"Object ID '{obj_id}' was last seen {current_time - self.last_seen[obj_id]:.2f} seconds ago.")
+                stable_objects.append(obj_id)
+                logger.debug(
+                    f"Object ID '{obj_id}' is stable. Detected for {current_time - first_seen_time:.2f} seconds.")
             else:
-                logging.debug(
+                logger.debug(
                     f"Object ID '{obj_id}' is not stable yet. Detected for {current_time - first_seen_time:.2f} seconds.")
         return stable_objects
+
+    def duration_thresholds_non_zero(self) -> bool:
+        return self.input_duration_threshold > 0 and self.output_duration_threshold > 0
