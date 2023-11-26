@@ -1,3 +1,4 @@
+import logging
 import os
 import random
 import time
@@ -6,6 +7,10 @@ import gridfs
 from pymongo import MongoClient
 
 from event import KssEvent
+from event_object import EventObject
+from object_tracker import ObjectTracker
+
+logging.basicConfig(level=logging.DEBUG)
 
 
 def load_image_paths(image_folder):
@@ -25,57 +30,77 @@ def load_image_as_bytes(image_path):
         return image_file.read()
 
 
-def save_event_to_mongo(kss_event: KssEvent):
+def save_event_to_mongo(kss_event: KssEvent, kss_event_image: bytes):
     collection = db['kss-events']
 
-    # Sprawdzenie rozmiaru obrazu
-    if len(kss_event.image) > 16 * 1024 * 1024:  # większy niż 16MB
-        fs = gridfs.GridFS(db)
-        image_id = fs.put(kss_event.image)
-        kss_event.image = image_id  # Zapisanie referencji do obrazu w GridFS
-    else:
-        kss_event.image = kss_event.image
+    fs = gridfs.GridFS(db)
+    image_id = fs.put(kss_event_image)
+    kss_event.image_id = image_id
 
-    # Zapisanie reszty danych do kolekcji
-    event_data = kss_event.__dict__
+    event_data = kss_event.__dict__()
     collection.insert_one(event_data)
 
 
-def mock_object_generator(events_probabilities, max_delay=2):
+def mock_object_generator(events_probabilities, max_delay=10, tracker: ObjectTracker = None):
     object_names = list(events_probabilities.keys())
 
     while True:
-        generated_objects = []
+        detected_objects: list[EventObject] = []
         for object_name in object_names:
             if random.random() < events_probabilities[object_name]:
-                random_image_path = random.choice(image_paths)
-                image_bytes = load_image_as_bytes(random_image_path)
-
-                generated_objects.append(KssEvent(
+                detected_objects.append(EventObject(
                     name=object_name,
                     count=random.randint(1, 5),
-                    image=image_bytes,
-                    confidence=random.uniform(0.5, 1.0),
-                    important=random.choice([True, False]),
-                    bounding_boxes=[
-                        [random.randint(0, 100), random.randint(0, 100), random.randint(0, 100), random.randint(0, 100)]
-                        for _ in range(random.randint(1, 3))]
+                    avg_confidence=random.uniform(0.5, 1.0),
                 ))
-        yield generated_objects
+
+        if detected_objects:
+            if tracker:
+                tracker.update(detected_objects)
+                stable_objects_ids = tracker.get_stable_objects()
+
+                # Debug print visualizing differences between objects lists
+                previous_set = {obj.name_count_id for obj in detected_objects}
+                current_set = {obj_id for obj_id in stable_objects_ids}
+
+                removed = previous_set - current_set
+                print("Removed objects:", ", ".join(removed))
+
+                # Replace detected objects with stable objects that
+                # were qualified by object tracker
+                detected_objects = [obj for obj in detected_objects if obj.name_count_id in stable_objects_ids]
+                print(f"Finally persistent objects: {[obj.__str__() for obj in detected_objects]}")
+
+            random_image_path = random.choice(image_paths)
+            image_bytes = load_image_as_bytes(random_image_path)
+
+            generated_event = KssEvent(
+                objects=detected_objects,
+                important=random.choice([True, False]),
+            )
+            yield generated_event, image_bytes
+
         time.sleep(random.uniform(1, max_delay))
 
 
-# Użycie:
-# Definiowanie prawdopodobieństwa wystąpienia każdego obiektu
 probabilities = {
-    "Fire": 0.7,  # 70% szans na pojawienie się ognia
-    "Smoke": 0.4,  # 40% szans na dym
-    "Person": 0.9  # 90% szans na osobę
+    "Fire": 0.2,
+    "Smoke": 0.3,
+    "Human": 0.7,
+    "Other": 0.9,
+    "Open pot": 0.8,
+    "Open pot boiling": 0.8,
+    "Closed pot": 0.6,
+    "Closed pot boiling": 0.6,
+    "Dish": 0.5,
+    "Gas": 0.2,
+    "Pan": 0.8,
+    "Closed pan": 0.8,
 }
 
-generator = mock_object_generator(probabilities)
+generator = mock_object_generator(probabilities, max_delay=6, tracker=ObjectTracker(3.0, 3.0))
 
-for objects in generator:
-    print(objects)
-    for event in objects:
-        save_event_to_mongo(kss_event=event)
+for event, event_image in generator:
+    if event.objects:
+        save_event_to_mongo(kss_event=event, kss_event_image=event_image)
+    print(event)

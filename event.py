@@ -1,35 +1,38 @@
 from datetime import datetime, timezone
+from bson import ObjectId
+
+from event_object import EventObject
 
 
 class KssEvent:
 
     def __init__(self,
-                 name: str,
-                 count: int,
-                 image: bytes,
-                 confidence: float,
+                 objects: list[EventObject],
+                 image_id: ObjectId | None = None,
                  date=None,
                  important=False,
-                 bounding_boxes=None,
                  read=False):
-        self.name = name
-        self.count = count
-        self.bounding_boxes = bounding_boxes
-        self.image = image
-        self.confidence = confidence
-        self.date = date if date is not None else datetime.now(tz=timezone.utc)
+        if objects is None:
+            objects = {}
+        self.objects = objects
+        self.image_id = image_id
+        self.date = date if date is not None else datetime.now()
         self.important = important
         self.read = read
 
+    def __dict__(self) -> dict:
+        return {
+            'objects': [obj.__dict__() for obj in self.objects],
+            'image_id': self.image_id,
+            'date': self.date,
+            'important': self.important,
+            'read': self.read
+        }
+
     def __str__(self):
-        bounding_boxes_str = ', '.join(f"({x}, {y}, {w}, {h})" for x, y, w, h in (self.bounding_boxes or []))
-        image_shape = self.image if self.image is not None else "None"
-        return (f"DetectedObject(\n"
-                f"  Name: {self.name}\n"
-                f"  Count: {self.count}\n"
-                f"  Bounding Boxes: [{bounding_boxes_str}]\n"
-                f"  Image Shape: {image_shape}\n"
-                f"  Confidence: {self.confidence:.2f}\n"
+        return (f"DetectedObjects(\n"
+                f"  Objects: {self.objects}\n"
+                f"  Image ID: {self.image_id}\n"
                 f"  Date: {self.date}\n"
                 f"  Important: {self.important}\n"
                 f"  Read: {self.read}\n)")
