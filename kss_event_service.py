@@ -1,5 +1,8 @@
+import threading
+
 import gridfs
 from loguru import logger
+from pymongo import MongoClient
 
 from event import KssEvent
 from event_change_detector import EventChangeDetector
@@ -18,6 +21,28 @@ class KssEventService:
         self.event_change_detector = EventChangeDetector()
         self.force_save_empty_events = force_save_empty_events
         self.change_detector_on = change_detector_on
+
+    def listen_for_config_changes(self):
+        def watch_config():
+            logger.debug("Starting config change stream...")
+            client = MongoClient('mongodb://localhost:27017/?replicaSet=rs0')
+            db = client.kss
+            collection = db['user-preferences']
+
+            with collection.watch() as stream:
+                for change in stream:
+                    logger.debug(f"Change detected: {change}")
+                    if change['operationType'] == 'update':
+                        new_config = collection.find_one({'_id': 1})
+                        self.apply_new_config(new_config)
+
+        config_thread = threading.Thread(target=watch_config)
+        config_thread.start()
+
+    def apply_new_config(self, config):
+        logger.debug(f"New config detected: {config}")
+        self.set_tracker_thresholds(config['input_threshold'], config['output_threshold'])
+        # Aktualizacja innych ustawień na podstawie `config` ...
 
     def save_event(self, event: KssEvent, event_image_bytes: bytes | None = None):
         logger.debug(f"Received an event for saving: {event.object_ids_str}")

@@ -68,11 +68,12 @@ probabilities = {
     "Closed pan": 0.8,
 }
 
-client = MongoClient('localhost', 27017)
+client = MongoClient('mongodb://localhost:27017/?replicaSet=rs0')
 db = client['kss']
 
 generator = mock_object_generator(probabilities, max_delay=6)
 event_service = KssEventService(db, input_duration_threshold=3, output_duration_threshold=3)
+event_service.listen_for_config_changes()
 
 for event, event_image in generator:
     if event.objects:
