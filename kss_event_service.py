@@ -118,3 +118,6 @@ class KssEventService:
 
     def is_system_on(self) -> bool:
         return self.settings.system_on
+
+    def is_object_important(self, object_name: str) -> bool:
+        return any(obj.important and obj.event_name == object_name for obj in self.settings.events_config)

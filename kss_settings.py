@@ -6,7 +6,8 @@ class KssEventConfig:
 
 
 class KssSettings:
-    def __init__(self, system_on: bool, input_threshold: int, output_threshold: int, events_config: [KssEventConfig]):
+    def __init__(self, system_on: bool, input_threshold: int, output_threshold: int,
+                 events_config: list[KssEventConfig]):
         self.system_on = system_on
         self.input_threshold = input_threshold
         self.output_threshold = output_threshold
