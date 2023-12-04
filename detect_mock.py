@@ -3,7 +3,6 @@ import os
 import random
 import time
 
-import firebase_admin
 from pymongo import MongoClient
 
 from event import KssEvent
@@ -47,7 +46,7 @@ def mock_object_generator(events_probabilities, max_delay=10):
 
             generated_event = KssEvent(
                 objects=detected_objects,
-                important=random.choice([True, False]),
+                important= True if random.randint(1, 10) == 1 else False,
             )
             yield generated_event, image_bytes
 
@@ -55,18 +54,18 @@ def mock_object_generator(events_probabilities, max_delay=10):
 
 
 probabilities = {
-    "Fire": 0.2,
-    "Smoke": 0.3,
-    "Human": 0.7,
-    "Other": 0.9,
-    "Open pot": 0.8,
-    "Open pot boiling": 0.8,
-    "Closed pot": 0.6,
-    "Closed pot boiling": 0.6,
-    "Dish": 0.5,
-    "Gas": 0.2,
-    "Pan": 0.8,
-    "Closed pan": 0.8,
+    "fire": 0.2,
+    "smoke": 0.3,
+    "human": 0.7,
+    "other": 0.9,
+    "open_pot": 0.8,
+    "open_pot_boiling": 0.8,
+    "closed_pot": 0.6,
+    "closed_pot_boiling": 0.6,
+    "dish": 0.5,
+    "gas": 0.2,
+    "pan": 0.8,
+    "closed_pan": 0.8,
 }
 
 client = MongoClient('mongodb://localhost:27017/?replicaSet=rs0')

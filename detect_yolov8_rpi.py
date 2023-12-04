@@ -3,6 +3,7 @@ import cv2
 from picamera2 import Picamera2
 from ultralytics import YOLO
 from pymongo import MongoClient
+from loguru import logger
 
 from kss_event_service import KssEventService
 from event import KssEvent
@@ -20,7 +21,7 @@ client = MongoClient('mongodb://localhost:27017/?replicaSet=rs0')
 db = client['kss']
 
 event_service = KssEventService(
-    db, input_duration_threshold=0, output_duration_threshold=0, force_save_empty_events=True)
+    db, input_duration_threshold=0, output_duration_threshold=0)
 event_service.listen_for_config_changes()
 
 while True:
@@ -36,8 +37,13 @@ while True:
 
     for i, result in enumerate(results):
         cls = int(result.boxes.cls[0].item())
-        name = result.names[cls]
         confidence = float(result.boxes.conf[0].item())
+        name = result.names[cls]
+
+        if not event_service.should_object_be_considered(name, confidence * 100):
+            logger.debug(f"{name} should not be considered, confidence was {confidence}")
+            continue
+        
         bounding_box = result.boxes.xyxy[0].cpu().numpy()
 
         x = int(bounding_box[0])
@@ -47,6 +53,7 @@ while True:
         bbox = [x, y, width, height]
 
         if event_service.is_object_important(object_name=name):
+            logger.debug(f"{name} is important")
             is_event_important = True
 
         if name not in detected_objects:
@@ -65,8 +72,7 @@ while True:
 
     kss_event = KssEvent(objects=processed_objects, important=is_event_important)
 
-    _, encoded_image = cv2.imencode(
-        '.jpg', cv2.cvtColor(results.plot(), cv2.COLOR_RGB2BGR))
+    _, encoded_image = cv2.imencode('.jpg', results.plot())
     image_bytes = encoded_image.tobytes()
 
     event_service.save_event(event=kss_event, event_image_bytes=image_bytes)

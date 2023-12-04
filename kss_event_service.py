@@ -12,6 +12,20 @@ from push_utils import send_important_event_message
 
 USER_PREFERENCES_COLLECTION = 'user-preferences'
 
+OBJECT_TRANSLATIONS = {
+    "fire": "Ogień",
+    "smoke": "Dym",
+    "human": "Człowiek",
+    "other": "Inne",
+    "open_pot": "Otwarty garnek",
+    "open_pot_boiling": "Gotujący się otwarty garnek",
+    "closed_pot": "Zamknięty garnek",
+    "closed_pot_boiling": "Gotujący się zamknięty garnek",
+    "dish": "Naczynie",
+    "gas": "Gaz",
+    "pan": "Patelnia",
+    "closed_pan": "Zamknięta patelnia",
+}
 
 class KssEventService:
     def __init__(self,
@@ -25,12 +39,13 @@ class KssEventService:
         self.event_change_detector = EventChangeDetector()
         self.force_save_empty_events = force_save_empty_events
         self.change_detector_on = change_detector_on
-        self.settings = self.init_kss_settings()
+        self.settings = None
+        self.init_kss_settings()
 
-    def init_kss_settings(self) -> KssSettings | None:
+    def init_kss_settings(self) -> KssSettings:
         collection = self.db[USER_PREFERENCES_COLLECTION]
         settings_data = collection.find_one({"_id": 1})
-
+        
         settings = None
 
         if settings_data:
@@ -38,11 +53,14 @@ class KssEventService:
                              event in settings_data['events_config']]
             settings = KssSettings(settings_data['system_on'], settings_data['input_threshold'],
                                    settings_data['output_threshold'], events_config)
+            # FIXME
+            self.set_tracker_thresholds(settings.input_threshold, settings.output_threshold)
+            self.settings = settings
+            self.apply_new_config(settings_data)
             logger.info("KSS settings initialized")
         else:
             logger.warning("No settings found in the database")
 
-        return settings
 
     def listen_for_config_changes(self):
         def watch_config():
@@ -83,6 +101,7 @@ class KssEventService:
             stable_objects_ids = self.object_tracker.get_stable_objects()
             stable_objects = [obj for obj in event.objects if obj.name_count_id in stable_objects_ids]
         else:
+            logger.debug("Skipping object tracker because tresholds where set to zero")
             stable_objects = event.objects
 
         event.objects = stable_objects
@@ -96,7 +115,7 @@ class KssEventService:
 
                 if event.important:
                     push_tokens = self.get_push_tokens()
-                    obj_names = [obj_name.name for obj_name in event.objects]
+                    obj_names = [OBJECT_TRANSLATIONS.get(obj.name, obj.name) for obj in event.objects]
 
                     for token in push_tokens:
                         logger.info(f"Event {event.object_ids_str} was important, sending push notification!")
@@ -131,6 +150,9 @@ class KssEventService:
 
     def is_object_important(self, object_name: str) -> bool:
         return any(obj.important and obj.event_name == object_name for obj in self.settings.events_config)
+    
+    def should_object_be_considered(self, object_name, current_precision) -> bool:
+        return any(current_precision >= obj.precision_threshold and obj.event_name == object_name for obj in self.settings.events_config)
 
     def get_push_tokens(self) -> list[str]:
         """Pobiera zapisane tokeny push z bazy danych."""
