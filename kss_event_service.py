@@ -8,6 +8,7 @@ from event import KssEvent
 from event_change_detector import EventChangeDetector
 from kss_settings import KssSettings, KssEventConfig
 from object_tracker import ObjectTracker
+from push_utils import send_important_event_message
 
 USER_PREFERENCES_COLLECTION = 'user-preferences'
 
@@ -92,6 +93,15 @@ class KssEventService:
 
             if new_event:
                 self._save_event_to_mongo(event, event_image_bytes)
+
+                if event.important:
+                    push_tokens = self.get_push_tokens()
+                    obj_names = [obj_name.name for obj_name in event.objects]
+
+                    for token in push_tokens:
+                        logger.info(f"Event {event.object_ids_str} was important, sending push notification!")
+                        send_important_event_message(obj_names, token)
+
                 logger.debug(f"Saved event: {event.object_ids_str}")
             else:
                 logger.debug(f"New event {event.object_ids_str} was the same as previous, skipping...")
@@ -121,3 +131,10 @@ class KssEventService:
 
     def is_object_important(self, object_name: str) -> bool:
         return any(obj.important and obj.event_name == object_name for obj in self.settings.events_config)
+
+    def get_push_tokens(self) -> list[str]:
+        """Pobiera zapisane tokeny push z bazy danych."""
+        collection = self.db['push-tokens']
+        push_tokens = collection.find({})
+
+        return [token_doc["token"] for token_doc in push_tokens]

@@ -32,6 +32,7 @@ while True:
     results = model(im)[0]
 
     detected_objects = {}
+    is_event_important = False
 
     for i, result in enumerate(results):
         cls = int(result.boxes.cls[0].item())
@@ -44,6 +45,9 @@ while True:
         width = int(bounding_box[2] - x)
         height = int(bounding_box[3] - y)
         bbox = [x, y, width, height]
+
+        if event_service.is_object_important(object_name=name):
+            is_event_important = True
 
         if name not in detected_objects:
             detected_objects[name] = {
@@ -59,7 +63,7 @@ while True:
         for class_name, info in detected_objects.items()
     ]
 
-    kss_event = KssEvent(objects=processed_objects)
+    kss_event = KssEvent(objects=processed_objects, important=is_event_important)
 
     _, encoded_image = cv2.imencode(
         '.jpg', cv2.cvtColor(results.plot(), cv2.COLOR_RGB2BGR))
