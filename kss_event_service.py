@@ -6,7 +6,10 @@ from pymongo import MongoClient
 
 from event import KssEvent
 from event_change_detector import EventChangeDetector
+from kss_settings import KssSettings, KssEventConfig
 from object_tracker import ObjectTracker
+
+USER_PREFERENCES_COLLECTION = 'user-preferences'
 
 
 class KssEventService:
@@ -21,6 +24,24 @@ class KssEventService:
         self.event_change_detector = EventChangeDetector()
         self.force_save_empty_events = force_save_empty_events
         self.change_detector_on = change_detector_on
+        self.settings = self.init_kss_settings()
+
+    def init_kss_settings(self) -> KssSettings | None:
+        collection = self.db[USER_PREFERENCES_COLLECTION]
+        settings_data = collection.find_one({"_id": 1})
+
+        settings = None
+
+        if settings_data:
+            events_config = [KssEventConfig(event['event_name'], event['precision_threshold'], event['important']) for
+                             event in settings_data['events_config']]
+            settings = KssSettings(settings_data['system_on'], settings_data['input_threshold'],
+                                   settings_data['output_threshold'], events_config)
+            logger.info("KSS settings initialized")
+        else:
+            logger.warning("No settings found in the database")
+
+        return settings
 
     def listen_for_config_changes(self):
         def watch_config():
@@ -41,8 +62,15 @@ class KssEventService:
 
     def apply_new_config(self, config):
         logger.debug(f"New config detected: {config}")
-        self.set_tracker_thresholds(config['input_threshold'], config['output_threshold'])
-        # Aktualizacja innych ustawień na podstawie `config` ...
+
+        self.settings.system_on = config['system_on']
+        self.settings.input_threshold = config['input_threshold']
+        self.settings.output_threshold = config['output_threshold']
+        self.settings.events_config = [
+            KssEventConfig(event['event_name'], event['precision_threshold'], event['important']) for
+            event in config['events_config']]
+
+        self.set_tracker_thresholds(self.settings.input_threshold, self.settings.output_threshold)
 
     def save_event(self, event: KssEvent, event_image_bytes: bytes = None):
         logger.debug(f"Received an event for saving: {event.object_ids_str}")
@@ -87,3 +115,9 @@ class KssEventService:
         self.object_tracker.output_duration_threshold = output_duration_threshold
         logger.debug(
             f"ObjectTracker thresholds set: input={input_duration_threshold}, output={output_duration_threshold}")
+
+    def is_system_on(self) -> bool:
+        return self.settings.system_on
+
+    def is_object_important(self, object_name: str) -> bool:
+        return any(obj.important and obj.event_name == object_name for obj in self.settings.events_config)
