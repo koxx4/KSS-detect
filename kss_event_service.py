@@ -72,7 +72,7 @@ class KssEventService:
 
         self.set_tracker_thresholds(self.settings.input_threshold, self.settings.output_threshold)
 
-    def save_event(self, event: KssEvent, event_image_bytes: bytes | None = None):
+    def save_event(self, event: KssEvent, event_image_bytes: bytes = None):
         logger.debug(f"Received an event for saving: {event.object_ids_str}")
 
         stable_objects = []
@@ -96,7 +96,7 @@ class KssEventService:
             else:
                 logger.debug(f"New event {event.object_ids_str} was the same as previous, skipping...")
 
-    def _save_event_to_mongo(self, event: KssEvent, event_image_bytes: bytes | None = None):
+    def _save_event_to_mongo(self, event: KssEvent, event_image_bytes: bytes = None):
         logger.debug(f"Saving event to MongoDB: {event.object_ids_str}")
 
         collection = self.db['kss-events']

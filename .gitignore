@@ -10,4 +10,5 @@ runs/
 *.ckpt
 *.pt
 *.onnx
+__pycache__/
 .env
