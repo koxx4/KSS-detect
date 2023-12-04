@@ -10,7 +10,7 @@ class KssEvent:
 
     def __init__(self,
                  objects: list[EventObject],
-                 image_id: ObjectId | None = None,
+                 image_id = None,
                  date=None,
                  important=False,
                  read=False):

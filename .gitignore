@@ -10,3 +10,4 @@ runs/
 *.ckpt
 *.pt
 *.onnx
+__pycache__/
