@@ -3,6 +3,7 @@ import os
 import random
 import time
 
+import firebase_admin
 from pymongo import MongoClient
 
 from event import KssEvent
